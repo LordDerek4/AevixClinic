@@ -1,4 +1,4 @@
-import { firestore } from '../lib/db';
+import { getDb } from '../lib/db';
 import { sendDueReminders } from '../lib/reminders';
 
 sendDueReminders()
@@ -9,4 +9,4 @@ sendDueReminders()
     console.error(err);
     process.exit(1);
   })
-  .finally(() => firestore.terminate());
+  .finally(() => getDb().terminate());

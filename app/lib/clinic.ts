@@ -1,4 +1,4 @@
-import { firestore } from './db';
+import { getDb } from './db';
 import { seedDatabase } from './seedDatabase';
 import { CLINIC_ID } from './firestoreModels';
 import type { ClinicDoc } from './firestoreModels';
@@ -13,6 +13,7 @@ export interface ClinicWithId extends ClinicDoc {
  * a one-off seed command) — see `seedDatabase` for the concurrency story.
  */
 export async function getDefaultClinic(): Promise<ClinicWithId> {
+  const firestore = getDb();
   const ref = firestore.collection('clinics').doc(CLINIC_ID);
   const snap = await ref.get();
   if (snap.exists) return { id: snap.id, ...(snap.data() as ClinicDoc) };

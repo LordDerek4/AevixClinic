@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import { firestore } from '../../../lib/db';
+import { getDb } from '../../../lib/db';
 import { getDefaultClinic } from '../../../lib/clinic';
 import { ApiError, withErrorHandling } from '../../../lib/apiError';
 import { withStaffAuth } from '../../../lib/requireStaffAuth';
@@ -35,6 +35,7 @@ function toClientShape(id: string, data: AppointmentDoc) {
 }
 
 export const GET = withStaffAuth(async (req: NextRequest) => {
+  const firestore = getDb();
   const clinic = await getDefaultClinic();
   const filter = req.nextUrl.searchParams.get('filter') ?? 'today';
   const practitionerId = req.nextUrl.searchParams.get('practitionerId') || undefined;
@@ -68,6 +69,7 @@ export const GET = withStaffAuth(async (req: NextRequest) => {
 });
 
 export const POST = withErrorHandling(async (req: NextRequest) => {
+  const firestore = getDb();
   const clinic = await getDefaultClinic();
   const body = await req.json().catch(() => null);
   if (!body) throw new ApiError('Invalid JSON body');

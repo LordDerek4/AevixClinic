@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import { firestore } from '../../../../lib/db';
+import { getDb } from '../../../../lib/db';
 import { getDefaultClinic } from '../../../../lib/clinic';
 import { ApiError } from '../../../../lib/apiError';
 import { withStaffAuth } from '../../../../lib/requireStaffAuth';
@@ -34,6 +34,7 @@ function toClientShape(id: string, data: AppointmentDoc) {
 
 export const PATCH = withStaffAuth<{ params: Promise<{ id: string }> }>(async (req, ctx) => {
   const { id } = await ctx.params;
+  const firestore = getDb();
   const clinic = await getDefaultClinic();
 
   const appointmentRef = firestore.collection('appointments').doc(id);

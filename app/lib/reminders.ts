@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase-admin/firestore';
-import { firestore } from './db';
+import { getDb } from './db';
 import { getDefaultClinic } from './clinic';
 import { sendSms } from './smsProvider';
 import type { AppointmentDoc } from './firestoreModels';
@@ -40,6 +40,7 @@ export async function sendDueReminders(): Promise<ReminderRunResult> {
   let remindersSent = 0;
   let nudgesSent = 0;
 
+  const firestore = getDb();
   const bookedSnap = await firestore.collection('appointments').where('status', '==', 'booked').get();
   const bookedDocs = bookedSnap.docs.filter((doc) => (doc.data() as AppointmentDoc).clinicId === clinic.id);
 

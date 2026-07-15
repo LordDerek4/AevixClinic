@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { firestore } from '../../../../lib/db';
+import { getDb } from '../../../../lib/db';
 import { getDefaultClinic } from '../../../../lib/clinic';
 import { withStaffAuth } from '../../../../lib/requireStaffAuth';
 import type { AppointmentDoc } from '../../../../lib/firestoreModels';
@@ -19,7 +19,7 @@ function rateForWindow(appointments: AppointmentDoc[], from: Date, to: Date) {
 
 export const GET = withStaffAuth(async () => {
   const clinic = await getDefaultClinic();
-
+  const firestore = getDb();
   const snap = await firestore.collection('appointments').where('clinicId', '==', clinic.id).get();
   const appointments = snap.docs.map((doc) => doc.data() as AppointmentDoc);
 

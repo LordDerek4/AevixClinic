@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { firestore } from '../../../lib/db';
+import { getDb } from '../../../lib/db';
 import { getDefaultClinic } from '../../../lib/clinic';
 import { withStaffAuth } from '../../../lib/requireStaffAuth';
 import type { PractitionerDoc } from '../../../lib/firestoreModels';
 
 export const GET = withStaffAuth(async () => {
   const clinic = await getDefaultClinic();
-
+  const firestore = getDb();
   const snap = await firestore.collection('practitioners').get();
   const practitioners = snap.docs
     .map((doc) => {

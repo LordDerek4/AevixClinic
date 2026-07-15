@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { firestore } from '../../../../lib/db';
+import { getDb } from '../../../../lib/db';
 import { getDefaultClinic } from '../../../../lib/clinic';
 import { ApiError } from '../../../../lib/apiError';
 import { withStaffAuth } from '../../../../lib/requireStaffAuth';
@@ -22,6 +22,7 @@ export const PUT = withStaffAuth(async (req: NextRequest) => {
   if (typeof practitionerId !== 'string') throw new ApiError('practitionerId is required');
   if (!Array.isArray(hours)) throw new ApiError('hours must be an array');
 
+  const firestore = getDb();
   const ref = firestore.collection('practitioners').doc(practitionerId);
   const snap = await ref.get();
   if (!snap.exists) throw new ApiError('Unknown practitioner', 404);

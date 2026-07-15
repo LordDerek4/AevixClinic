@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { firestore } from '../../../../lib/db';
+import { getDb } from '../../../../lib/db';
 import { getDefaultClinic } from '../../../../lib/clinic';
 import { ApiError } from '../../../../lib/apiError';
 import { withStaffAuth } from '../../../../lib/requireStaffAuth';
 
 export const PUT = withStaffAuth(async (req: NextRequest) => {
+  const firestore = getDb();
   const clinic = await getDefaultClinic();
   const body = await req.json().catch(() => null);
   if (!body) throw new ApiError('Invalid JSON body');

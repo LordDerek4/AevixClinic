@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { adminAuth, firebaseAdminConfigured } from './firebaseAdmin';
-import { firestore } from './db';
+import { getDb } from './db';
 import type { PractitionerDoc } from './firestoreModels';
 
 export class AuthError extends Error {
@@ -42,6 +42,7 @@ export async function requireStaffAuth(request: NextRequest): Promise<StaffPract
 
   if (!decoded.email) throw new AuthError('Firebase account has no email', 401);
 
+  const firestore = getDb();
   const snap = await firestore.collection('practitioners').where('email', '==', decoded.email).limit(1).get();
   if (snap.empty) throw new AuthError('No staff account found for this email', 403);
 

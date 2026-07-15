@@ -1,11 +1,17 @@
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { adminApp } from './firebaseAdmin';
 
-if (!adminApp) {
-  throw new Error(
-    'Firestore is not configured. Set FIREBASE_ADMIN_* env vars (see .env.example), ' +
-      'or FIRESTORE_EMULATOR_HOST for local testing against the emulator.',
-  );
-}
+let _firestore: Firestore | undefined;
 
-export const firestore = getFirestore(adminApp);
+export function getDb(): Firestore {
+  if (!_firestore) {
+    if (!adminApp) {
+      throw new Error(
+        'Firestore is not configured. Set FIREBASE_ADMIN_* env vars (see .env.example), ' +
+          'or FIRESTORE_EMULATOR_HOST for local testing against the emulator.',
+      );
+    }
+    _firestore = getFirestore(adminApp);
+  }
+  return _firestore;
+}

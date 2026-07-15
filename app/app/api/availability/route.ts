@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { firestore } from '../../../lib/db';
+import { getDb } from '../../../lib/db';
 import { getDefaultClinic } from '../../../lib/clinic';
 import { ApiError, withErrorHandling } from '../../../lib/apiError';
 import { computeAvailableStartMinutes, minutesToTime, parseDateOnly } from '../../../lib/scheduling';
@@ -7,6 +7,7 @@ import type { AppointmentDoc, PractitionerDoc, ServiceDoc } from '../../../lib/f
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   await getDefaultClinic();
+  const firestore = getDb();
   const serviceId = req.nextUrl.searchParams.get('serviceId');
   const dateParam = req.nextUrl.searchParams.get('date');
   const practitionerId = req.nextUrl.searchParams.get('practitionerId') || undefined;

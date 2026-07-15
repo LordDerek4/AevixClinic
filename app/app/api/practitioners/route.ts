@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { firestore } from '../../../lib/db';
+import { getDb } from '../../../lib/db';
 import { getDefaultClinic } from '../../../lib/clinic';
 import { withErrorHandling } from '../../../lib/apiError';
 import type { PractitionerDoc } from '../../../lib/firestoreModels';
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   await getDefaultClinic();
+  const firestore = getDb();
   const serviceId = req.nextUrl.searchParams.get('serviceId');
 
   const query = serviceId
