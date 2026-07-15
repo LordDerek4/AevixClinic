@@ -4,8 +4,8 @@ A clinic appointment booking and no-show reduction app. Patients book as guests
 (no account); staff sign in to manage the schedule, mark appointments, set
 availability, and configure reminders.
 
-Full-stack Next.js (App Router) + TypeScript, Prisma + SQLite, Firebase Auth
-for staff login. Designed to run entirely locally for testing.
+Full-stack Next.js (App Router) + TypeScript, Prisma + Postgres, Firebase Auth
+for staff login.
 
 ## Data model
 
@@ -16,19 +16,43 @@ for staff login. Designed to run entirely locally for testing.
 - **Patient** — name, phone, email — created fresh per booking, no login
 - **Appointment** — patient, practitioner, service, start/end time, status (`booked` / `completed` / `no_show` / `cancelled`)
 
-## Setup
+## Deploying (no terminal required)
+
+The database self-seeds on first use (see `lib/clinic.ts`), and `npm run build`
+runs migrations automatically (see `package.json`), so deploying is just
+clicking through Vercel's website:
+
+1. Go to https://vercel.com and sign up/log in with GitHub (free).
+2. **Add New → Project**, pick this repo. Set **Root Directory** to `app`.
+3. Before deploying, go to the **Storage** tab → **Create Database** → **Postgres**
+   (Vercel's own, free tier is enough) → connect it to this project. That sets
+   `DATABASE_URL` automatically.
+4. In **Settings → Environment Variables**, add the Firebase variables from
+   `.env.example` (see the Firebase Auth section below) — or skip this for now
+   and add them later; the app runs fine without them, staff pages just show a
+   setup notice instead of gating access.
+5. Click **Deploy**. That's it — Vercel runs `npm run build` (migrations +
+   Next.js build) and gives you a live URL, e.g. `https://your-project.vercel.app`.
+   Patient booking is at `/book`, staff at `/staff/login`.
+
+Every push to the connected GitHub branch redeploys automatically.
+
+## Local setup (optional, for development)
 
 ```bash
 npm install
-cp .env.example .env   # fill in Firebase credentials, see below
-npm run db:migrate     # creates prisma/dev.db and applies the schema
-npm run db:seed        # loads sample clinic/staff/services/appointments
+cp .env.example .env   # point DATABASE_URL at a local Postgres, fill in Firebase creds
+npm run db:migrate     # applies the schema
 npm run dev
 ```
 
 Then:
 - Patient booking flow: http://localhost:3000/book
 - Staff dashboard: http://localhost:3000/staff/login
+
+(`npm run db:seed` forcibly resets to fresh sample data — useful locally, but
+the app also seeds itself automatically the first time it's queried against an
+empty database, so it's not required.)
 
 ### Firebase Auth (staff login)
 
@@ -52,14 +76,11 @@ API routes return a clear 500 in that state rather than silently succeeding.
 
 ### Database
 
-SQLite via Prisma (`prisma/schema.prisma`, generated client in
-`prisma/generated/prisma`). To reset to a clean seeded state at any point:
-
-```bash
-rm -f dev.db && npm run db:migrate && npm run db:seed
-```
-
-`npm run db:studio` opens Prisma Studio to browse/edit data directly.
+Postgres via Prisma (`prisma/schema.prisma`, generated client in
+`prisma/generated/prisma`). The app seeds sample data automatically the first
+time it queries an empty database — no manual seed step needed after a fresh
+deploy. `npm run db:studio` opens Prisma Studio to browse/edit data directly
+(point `DATABASE_URL` at whichever database you want to inspect).
 
 ## Reminder system
 
