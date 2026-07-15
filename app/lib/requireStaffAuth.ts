@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { adminAuth, firebaseAdminConfigured } from './firebaseAdmin';
+import { getAdminAuth, firebaseAdminConfigured } from './firebaseAdmin';
 import { getDb } from './db';
 import type { PractitionerDoc } from './firestoreModels';
 
@@ -22,7 +22,8 @@ export interface StaffPractitioner extends PractitionerDoc {
  * by UID rather than email alone.
  */
 export async function requireStaffAuth(request: NextRequest): Promise<StaffPractitioner> {
-  if (!firebaseAdminConfigured || !adminAuth) {
+  const adminAuth = getAdminAuth();
+  if (!firebaseAdminConfigured() || !adminAuth) {
     throw new AuthError(
       'Staff authentication is not configured on the server (missing FIREBASE_ADMIN_* env vars).',
       500,
