@@ -1,0 +1,223 @@
+.page {
+  padding: 32px;
+  max-width: 760px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sectionLabel {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.practitionerSelect {
+  border: 1px solid var(--color-border-input);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.hoursTable {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.hoursRow {
+  display: grid;
+  grid-template-columns: 120px 64px 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.hoursRow:last-child {
+  border-bottom: none;
+}
+
+.dayName {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dayNameClosed {
+  color: var(--color-text-faint);
+}
+
+.timeRange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.timeSelect {
+  border: 1px solid var(--color-border-input);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.toWord {
+  color: var(--color-text-faint);
+}
+
+.closedLabel {
+  font-size: 14px;
+  color: var(--color-text-faint);
+}
+
+.remindersCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.reminderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.reminderRowBordered {
+  border-top: 1px solid var(--color-divider);
+  padding-top: 18px;
+}
+
+.reminderText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reminderTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.reminderSubtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.reminderControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.reminderSelect {
+  border: 1px solid var(--color-border-input);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  color: var(--color-text);
+}
+
+.previewBox {
+  background: var(--color-surface-muted);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.previewLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.savedNote {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.errorNote {
+  font-size: 13px;
+  color: #B23A3A;
+  font-weight: 600;
+}
+
+.saveButton {
+  background: var(--accent);
+  color: #fff;
+  padding: 12px 28px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.saveButton:hover {
+  background: #254B42;
+}
+
+.saveButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading {
+  padding: 48px 0;
+  text-align: center;
+  color: var(--color-text-muted);
+}

@@ -1,0 +1,96 @@
+.dateStrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.dateCell {
+  flex: 0 0 auto;
+  width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dateCellSelected {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 11px 0;
+}
+
+.weekday {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.weekdaySelected {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.dayNum {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.dayNumSelected {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.periodGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.periodLabel {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.periodLabel:not(:first-child) {
+  margin-top: 6px;
+}
+
+.slotGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.slot {
+  padding: 13px 0;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 500;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.slotSelected {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  font-weight: 700;
+}
+
+.emptyState {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  padding: 12px 0;
+}

@@ -1,0 +1,62 @@
+.page {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 720px;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dayRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+
+.dayRowToday {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.dayLabel {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dayMeta {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.dayMetaClosed {
+  color: var(--color-text-faint);
+}
+
+.todayTag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 8px;
+}

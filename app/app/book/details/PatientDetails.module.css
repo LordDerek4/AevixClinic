@@ -1,0 +1,106 @@
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.optional {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.input {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-family: inherit;
+  min-height: 48px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.inputError {
+  border-color: #B23A3A;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.errorHint {
+  font-size: 13px;
+  color: #B23A3A;
+}
+
+.consent {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--accent-soft);
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+}
+
+.consentCheck {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.consentCheckOn {
+  background: var(--accent);
+  color: #fff;
+}
+
+.consentCheckOff {
+  background: #fff;
+  border: 1px solid var(--color-border-input);
+}
+
+.consentText {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footerNote {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  text-align: center;
+  line-height: 1.5;
+}

@@ -1,0 +1,63 @@
+:root {
+  --accent: #33665A;
+  --accent-soft: #E7EFEB;
+  --radius: 12px;
+  --radius-sm: calc(var(--radius) - 2px);
+
+  --color-bg: #F4F3EF;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #FBFAF8;
+  --color-surface-muted: #F7F6F2;
+  --color-border: #E4E2DC;
+  --color-border-input: #D5D3CC;
+  --color-divider: #EFEEE9;
+
+  --color-text: #232826;
+  --color-text-secondary: #454C49;
+  --color-text-muted: #6B7370;
+  --color-text-faint: #9AA29E;
+
+  --color-warn-text: #8A5A2B;
+  --color-warn-bg: #F3E9DC;
+
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-serif: 'Source Serif 4', serif;
+
+  --shadow-card: 0 1px 3px rgba(35, 40, 38, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent);
+}
+a:hover {
+  color: #254B42;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
+}
+
+input::placeholder {
+  color: var(--color-text-faint);
+}
+
+button {
+  cursor: pointer;
+}

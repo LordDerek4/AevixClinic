@@ -1,0 +1,42 @@
+.track {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  position: relative;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.track:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.on {
+  background: var(--accent);
+}
+
+.off {
+  background: var(--color-border-input);
+}
+
+.thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 2px;
+  transition: left 0.15s ease, right 0.15s ease;
+}
+
+.on .thumb {
+  right: 2px;
+}
+
+.off .thumb {
+  left: 2px;
+}
