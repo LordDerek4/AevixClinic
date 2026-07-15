@@ -1,8 +1,8 @@
-import type { Prisma } from '../prisma/generated/prisma/client';
+import type { Firestore, Transaction } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import { ApiError } from './apiError';
 import { isValidPhone } from './scheduling';
-
-type Tx = Prisma.TransactionClient;
+import type { AppointmentDoc, AvailabilityWindowDoc, PractitionerDoc } from './firestoreModels';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -35,74 +35,79 @@ export function validatePatientInput(input: unknown): PatientInput {
   };
 }
 
-/** Whether the given practitioner has a recurring availability window covering [startsAt, endsAt) on its weekday. */
-export async function isWithinAvailabilityWindow(
-  tx: Tx,
-  practitionerId: string,
+/** Whether [startsAt, endsAt) on its weekday falls fully inside one of the practitioner's recurring windows. */
+export function isWithinAvailabilityWindow(
+  availability: AvailabilityWindowDoc[],
   startsAt: Date,
   endsAt: Date,
-): Promise<boolean> {
+): boolean {
   const dayStart = new Date(startsAt);
   dayStart.setHours(0, 0, 0, 0);
   const startMinutes = Math.round((startsAt.getTime() - dayStart.getTime()) / 60_000);
   const endMinutes = Math.round((endsAt.getTime() - dayStart.getTime()) / 60_000);
   const weekday = startsAt.getDay();
 
-  const windows = await tx.availability.findMany({ where: { practitionerId, weekday } });
-  return windows.some((w) => startMinutes >= w.startMinutes && endMinutes <= w.endMinutes);
+  return availability.some((w) => w.weekday === weekday && startMinutes >= w.startMinutes && endMinutes <= w.endMinutes);
 }
 
-/** Whether the practitioner has no conflicting active appointment overlapping [startsAt, endsAt). */
+/**
+ * Whether the practitioner has no conflicting active appointment overlapping [startsAt, endsAt).
+ * Queries by practitionerId only (always index-free in Firestore) and filters the rest in
+ * memory — appointment volumes at this MVP's scale make that cheaper than managing composite
+ * indexes for a production deploy that has to work without any manual Firestore console steps.
+ */
 export async function hasNoConflict(
-  tx: Tx,
+  firestore: Firestore,
+  tx: Transaction,
   practitionerId: string,
   startsAt: Date,
   endsAt: Date,
   excludeAppointmentId?: string,
 ): Promise<boolean> {
-  const conflict = await tx.appointment.findFirst({
-    where: {
-      practitionerId,
-      status: { in: ['booked', 'completed'] },
-      id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
-      startsAt: { lt: endsAt },
-      endsAt: { gt: startsAt },
-    },
+  const snap = await tx.get(firestore.collection('appointments').where('practitionerId', '==', practitionerId));
+
+  return !snap.docs.some((doc) => {
+    if (doc.id === excludeAppointmentId) return false;
+    const data = doc.data() as AppointmentDoc;
+    if (data.status !== 'booked' && data.status !== 'completed') return false;
+    const existingStart = data.startsAt.toDate();
+    const existingEnd = data.endsAt.toDate();
+    return existingStart < endsAt && existingEnd > startsAt;
   });
-  return !conflict;
 }
 
 export async function isPractitionerFreeAt(
-  tx: Tx,
-  practitionerId: string,
+  firestore: Firestore,
+  tx: Transaction,
+  practitioner: { id: string; availability: AvailabilityWindowDoc[] },
   startsAt: Date,
   endsAt: Date,
   excludeAppointmentId?: string,
 ): Promise<boolean> {
-  const [withinHours, noConflict] = await Promise.all([
-    isWithinAvailabilityWindow(tx, practitionerId, startsAt, endsAt),
-    hasNoConflict(tx, practitionerId, startsAt, endsAt, excludeAppointmentId),
-  ]);
-  return withinHours && noConflict;
+  if (!isWithinAvailabilityWindow(practitioner.availability, startsAt, endsAt)) return false;
+  return hasNoConflict(firestore, tx, practitioner.id, startsAt, endsAt, excludeAppointmentId);
 }
 
 /** Picks the first practitioner (in creation order) offering the service who is free at the given time. */
 export async function pickAutoAssignedPractitioner(
-  tx: Tx,
-  clinicId: string,
-  serviceId: string,
+  firestore: Firestore,
+  tx: Transaction,
+  candidates: { id: string; availability: AvailabilityWindowDoc[] }[],
   startsAt: Date,
   endsAt: Date,
 ): Promise<string | null> {
-  const practitioners = await tx.practitioner.findMany({
-    where: { clinicId, services: { some: { serviceId } } },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  for (const practitioner of practitioners) {
-    if (await isPractitionerFreeAt(tx, practitioner.id, startsAt, endsAt)) {
+  for (const practitioner of candidates) {
+    if (await isPractitionerFreeAt(firestore, tx, practitioner, startsAt, endsAt)) {
       return practitioner.id;
     }
   }
   return null;
+}
+
+export function toTimestamp(date: Date): Timestamp {
+  return Timestamp.fromDate(date);
+}
+
+export function practitionerDocToCandidate(id: string, data: PractitionerDoc) {
+  return { id, availability: data.availability };
 }

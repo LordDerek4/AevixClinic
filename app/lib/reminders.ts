@@ -1,6 +1,8 @@
-import { prisma } from './db';
+import { Timestamp } from 'firebase-admin/firestore';
+import { firestore } from './db';
 import { getDefaultClinic } from './clinic';
 import { sendSms } from './smsProvider';
+import type { AppointmentDoc } from './firestoreModels';
 
 function formatDateTime(d: Date): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -25,57 +27,53 @@ export interface ReminderRunResult {
  * Finds appointments whose reminder (or same-day nudge) is due and sends them.
  * Designed to be safe to call repeatedly/on-demand: each appointment is only
  * ever reminded once per kind, tracked via `reminderSentAt` / `nudgeSentAt`.
+ *
+ * Queries `status == 'booked'` only (single-field equality, index-free) and
+ * filters the timing window in memory — see lib/booking.ts for why this
+ * project avoids composite Firestore queries entirely.
  */
 export async function sendDueReminders(): Promise<ReminderRunResult> {
   const clinic = await getDefaultClinic();
-  const settings = await prisma.reminderSettings.findUnique({ where: { clinicId: clinic.id } });
-  const hoursBefore = settings?.hoursBefore ?? 24;
-  const sameDayNudge = settings?.sameDayNudge ?? false;
+  const { hoursBefore, sameDayNudge } = clinic.reminderSettings;
 
   const now = new Date();
   let remindersSent = 0;
   let nudgesSent = 0;
 
-  const reminderDue = await prisma.appointment.findMany({
-    where: {
-      clinicId: clinic.id,
-      status: 'booked',
-      reminderSentAt: null,
-      startsAt: { gt: now, lte: new Date(now.getTime() + hoursBefore * 60 * 60 * 1000) },
-    },
-    include: { patient: true, practitioner: true },
-  });
+  const bookedSnap = await firestore.collection('appointments').where('status', '==', 'booked').get();
+  const bookedDocs = bookedSnap.docs.filter((doc) => (doc.data() as AppointmentDoc).clinicId === clinic.id);
 
-  for (const appt of reminderDue) {
+  const reminderWindowEnd = new Date(now.getTime() + hoursBefore * 60 * 60 * 1000);
+  for (const doc of bookedDocs) {
+    const data = doc.data() as AppointmentDoc;
+    if (data.reminderSentAt) continue;
+    const startsAt = data.startsAt.toDate();
+    if (!(startsAt > now && startsAt <= reminderWindowEnd)) continue;
+
     const message =
-      `Hi ${appt.patient.name.split(' ')[0]} — reminder: your appointment at ${clinic.name} is ` +
-      `${formatDateTime(appt.startsAt)} with ${appt.practitioner.name}. ` +
+      `Hi ${data.patientName.split(' ')[0]} — reminder: your appointment at ${clinic.name} is ` +
+      `${formatDateTime(startsAt)} with ${data.practitionerName}. ` +
       `Need to cancel or reschedule? Call ${clinic.phone}.`;
-    await sendSms(appt.patient.phone, message);
-    await prisma.appointment.update({ where: { id: appt.id }, data: { reminderSentAt: now } });
+    await sendSms(data.patientPhone, message);
+    await doc.ref.update({ reminderSentAt: Timestamp.now() });
     remindersSent++;
   }
 
   if (sameDayNudge) {
-    const nudgeDue = await prisma.appointment.findMany({
-      where: {
-        clinicId: clinic.id,
-        status: 'booked',
-        nudgeSentAt: null,
-        startsAt: { gt: now, lte: new Date(now.getTime() + 2 * 60 * 60 * 1000) },
-      },
-      include: { patient: true, practitioner: true },
-    });
-
-    for (const appt of nudgeDue) {
-      if (appt.startsAt.getHours() >= 12) continue; // nudge is for morning bookings only
+    const nudgeWindowEnd = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    for (const doc of bookedDocs) {
+      const data = doc.data() as AppointmentDoc;
+      if (data.nudgeSentAt) continue;
+      const startsAt = data.startsAt.toDate();
+      if (!(startsAt > now && startsAt <= nudgeWindowEnd)) continue;
+      if (startsAt.getHours() >= 12) continue; // nudge is for morning bookings only
 
       const message =
-        `Hi ${appt.patient.name.split(' ')[0]} — just a reminder your appointment at ${clinic.name} ` +
-        `is today at ${formatTime(appt.startsAt)} with ${appt.practitioner.name}. ` +
+        `Hi ${data.patientName.split(' ')[0]} — just a reminder your appointment at ${clinic.name} ` +
+        `is today at ${formatTime(startsAt)} with ${data.practitionerName}. ` +
         `Call ${clinic.phone} if you need to reschedule.`;
-      await sendSms(appt.patient.phone, message);
-      await prisma.appointment.update({ where: { id: appt.id }, data: { nudgeSentAt: now } });
+      await sendSms(data.patientPhone, message);
+      await doc.ref.update({ nudgeSentAt: Timestamp.now() });
       nudgesSent++;
     }
   }

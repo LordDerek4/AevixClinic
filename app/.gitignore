@@ -41,8 +41,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/prisma/generated/prisma
-
-# sqlite database (created by `npm run db:migrate` + `npm run db:seed`)
-/dev.db
-/dev.db-journal
+# firebase emulator
+firebase-debug.log
+firestore-debug.log
+.firebase/

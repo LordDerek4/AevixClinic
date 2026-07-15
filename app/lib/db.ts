@@ -1,15 +1,11 @@
-import { PrismaClient } from '../prisma/generated/prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { getFirestore } from 'firebase-admin/firestore';
+import { adminApp } from './firebaseAdmin';
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-
-function createClient() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  return new PrismaClient({ adapter });
+if (!adminApp) {
+  throw new Error(
+    'Firestore is not configured. Set FIREBASE_ADMIN_* env vars (see .env.example), ' +
+      'or FIRESTORE_EMULATOR_HOST for local testing against the emulator.',
+  );
 }
 
-export const prisma = globalForPrisma.prisma ?? createClient();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+export const firestore = getFirestore(adminApp);

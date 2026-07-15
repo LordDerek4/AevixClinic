@@ -1,52 +1,70 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { prisma } from '../../../lib/db';
+import { Timestamp } from 'firebase-admin/firestore';
+import { firestore } from '../../../lib/db';
 import { getDefaultClinic } from '../../../lib/clinic';
 import { ApiError, withErrorHandling } from '../../../lib/apiError';
 import { withStaffAuth } from '../../../lib/requireStaffAuth';
 import { combineDateAndTime, parseDateOnly } from '../../../lib/scheduling';
 import {
-  hasNoConflict,
   isWithinAvailabilityWindow,
+  hasNoConflict,
   pickAutoAssignedPractitioner,
   validatePatientInput,
 } from '../../../lib/booking';
-import type { AppointmentStatus } from '../../../prisma/generated/prisma/client';
+import type { AppointmentDoc, AppointmentStatusValue, PatientDoc, PractitionerDoc, ServiceDoc } from '../../../lib/firestoreModels';
 
-const appointmentInclude = {
-  patient: { select: { id: true, name: true, phone: true, email: true } },
-  practitioner: { select: { id: true, name: true, role: true } },
-  service: { select: { id: true, name: true, durationMinutes: true } },
-} as const;
+function dateKeyFor(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function toClientShape(id: string, data: AppointmentDoc) {
+  return {
+    id,
+    startsAt: data.startsAt.toDate().toISOString(),
+    endsAt: data.endsAt.toDate().toISOString(),
+    status: data.status,
+    notes: data.notes,
+    reminderSentAt: data.reminderSentAt ? data.reminderSentAt.toDate().toISOString() : null,
+    patient: { id: data.patientId, name: data.patientName, phone: data.patientPhone, email: data.patientEmail },
+    practitioner: { id: data.practitionerId, name: data.practitionerName, role: '' },
+    service: { id: data.serviceId, name: data.serviceName, durationMinutes: data.serviceDurationMinutes },
+  };
+}
 
 export const GET = withStaffAuth(async (req: NextRequest) => {
   const clinic = await getDefaultClinic();
   const filter = req.nextUrl.searchParams.get('filter') ?? 'today';
   const practitionerId = req.nextUrl.searchParams.get('practitionerId') || undefined;
-  const status = req.nextUrl.searchParams.get('status') as AppointmentStatus | null;
+  const status = req.nextUrl.searchParams.get('status') as AppointmentStatusValue | null;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const tomorrowStart = new Date(todayStart);
   tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
-  let startsAtFilter: { gte?: Date; lt?: Date } = {};
-  if (filter === 'today') startsAtFilter = { gte: todayStart, lt: tomorrowStart };
-  else if (filter === 'upcoming') startsAtFilter = { gte: tomorrowStart };
-  else if (filter === 'past') startsAtFilter = { lt: todayStart };
-  // filter === 'all' -> no date bounds
+  const snap = await firestore.collection('appointments').where('clinicId', '==', clinic.id).get();
 
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      clinicId: clinic.id,
-      startsAt: startsAtFilter,
-      ...(practitionerId ? { practitionerId } : {}),
-      ...(status ? { status } : {}),
-    },
-    orderBy: { startsAt: filter === 'past' ? 'desc' : 'asc' },
-    include: appointmentInclude,
+  let appointments = snap.docs.map((doc) => ({ id: doc.id, data: doc.data() as AppointmentDoc }));
+
+  appointments = appointments.filter(({ data }) => {
+    const startsAt = data.startsAt.toDate();
+    if (filter === 'today') return startsAt >= todayStart && startsAt < tomorrowStart;
+    if (filter === 'upcoming') return startsAt >= tomorrowStart;
+    if (filter === 'past') return startsAt < todayStart;
+    return true; // 'all'
+  });
+  if (practitionerId) appointments = appointments.filter(({ data }) => data.practitionerId === practitionerId);
+  if (status) appointments = appointments.filter(({ data }) => data.status === status);
+
+  appointments.sort((a, b) => {
+    const diff = a.data.startsAt.toMillis() - b.data.startsAt.toMillis();
+    return filter === 'past' ? -diff : diff;
   });
 
-  return NextResponse.json({ appointments });
+  return NextResponse.json({ appointments: appointments.map(({ id, data }) => toClientShape(id, data)) });
 });
 
 export const POST = withErrorHandling(async (req: NextRequest) => {
@@ -64,8 +82,9 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   const patientInput = validatePatientInput(body.patient);
 
-  const service = await prisma.service.findFirst({ where: { id: serviceId, clinicId: clinic.id } });
-  if (!service) throw new ApiError('Unknown service', 404);
+  const serviceSnap = await firestore.collection('services').doc(serviceId).get();
+  if (!serviceSnap.exists) throw new ApiError('Unknown service', 404);
+  const service = serviceSnap.data() as ServiceDoc;
 
   let day: Date;
   try {
@@ -84,42 +103,78 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     throw new ApiError('practitionerId must be a string if provided');
   }
 
-  const appointment = await prisma.$transaction(async (tx) => {
-    let resolvedPractitionerId = practitionerId as string | undefined;
+  const appointmentRef = firestore.collection('appointments').doc();
 
-    if (resolvedPractitionerId) {
-      const offers = await tx.practitionerService.findFirst({
-        where: { practitionerId: resolvedPractitionerId, serviceId },
-      });
-      if (!offers) throw new ApiError('This practitioner does not offer the selected service', 400);
+  const appointment = await firestore.runTransaction(async (tx) => {
+    let resolvedPractitionerId: string;
+    let resolvedPractitioner: PractitionerDoc;
 
-      const withinHours = await isWithinAvailabilityWindow(tx, resolvedPractitionerId, startsAt, endsAt);
-      if (!withinHours) throw new ApiError('That time is outside business hours', 409);
-
-      const free = await hasNoConflict(tx, resolvedPractitionerId, startsAt, endsAt);
+    if (typeof practitionerId === 'string') {
+      const snap = await tx.get(firestore.collection('practitioners').doc(practitionerId));
+      if (!snap.exists) throw new ApiError('Unknown practitioner', 404);
+      const data = snap.data() as PractitionerDoc;
+      if (!data.serviceIds.includes(serviceId)) {
+        throw new ApiError('This practitioner does not offer the selected service', 400);
+      }
+      if (!isWithinAvailabilityWindow(data.availability, startsAt, endsAt)) {
+        throw new ApiError('That time is outside business hours', 409);
+      }
+      const free = await hasNoConflict(firestore, tx, snap.id, startsAt, endsAt);
       if (!free) throw new ApiError('That slot was just booked — please pick another time', 409);
+      resolvedPractitionerId = snap.id;
+      resolvedPractitioner = data;
     } else {
-      const picked = await pickAutoAssignedPractitioner(tx, clinic.id, serviceId, startsAt, endsAt);
-      if (!picked) throw new ApiError('That slot is no longer available — please pick another time', 409);
-      resolvedPractitionerId = picked;
-    }
-
-    const patient = await tx.patient.create({ data: patientInput });
-
-    return tx.appointment.create({
-      data: {
-        clinicId: clinic.id,
-        patientId: patient.id,
-        practitionerId: resolvedPractitionerId,
-        serviceId,
+      const candidatesSnap = await tx.get(
+        firestore.collection('practitioners').where('serviceIds', 'array-contains', serviceId),
+      );
+      const candidates = candidatesSnap.docs.map((d) => ({ id: d.id, data: d.data() as PractitionerDoc }));
+      const pickedId = await pickAutoAssignedPractitioner(
+        firestore,
+        tx,
+        candidates.map((c) => ({ id: c.id, availability: c.data.availability })),
         startsAt,
         endsAt,
-        notes: typeof notes === 'string' && notes.trim() ? notes.trim() : undefined,
-        status: 'booked',
-      },
-      include: appointmentInclude,
-    });
+      );
+      if (!pickedId) throw new ApiError('That slot is no longer available — please pick another time', 409);
+      resolvedPractitionerId = pickedId;
+      resolvedPractitioner = candidates.find((c) => c.id === pickedId)!.data;
+    }
+
+    const patientRef = firestore.collection('patients').doc();
+    const patientDoc: PatientDoc = {
+      name: patientInput.name,
+      phone: patientInput.phone,
+      email: patientInput.email ?? null,
+      createdAt: Timestamp.now(),
+    };
+    tx.create(patientRef, patientDoc);
+
+    const now = Timestamp.now();
+    const appointmentDoc: AppointmentDoc = {
+      clinicId: clinic.id,
+      patientId: patientRef.id,
+      practitionerId: resolvedPractitionerId,
+      serviceId,
+      dateKey: dateKeyFor(startsAt),
+      startsAt: Timestamp.fromDate(startsAt),
+      endsAt: Timestamp.fromDate(endsAt),
+      status: 'booked',
+      notes: typeof notes === 'string' && notes.trim() ? notes.trim() : null,
+      reminderSentAt: null,
+      nudgeSentAt: null,
+      createdAt: now,
+      updatedAt: now,
+      patientName: patientDoc.name,
+      patientPhone: patientDoc.phone,
+      patientEmail: patientDoc.email,
+      practitionerName: resolvedPractitioner.name,
+      serviceName: service.name,
+      serviceDurationMinutes: service.durationMinutes,
+    };
+    tx.create(appointmentRef, appointmentDoc);
+
+    return appointmentDoc;
   });
 
-  return NextResponse.json({ appointment }, { status: 201 });
+  return NextResponse.json({ appointment: toClientShape(appointmentRef.id, appointment) }, { status: 201 });
 });

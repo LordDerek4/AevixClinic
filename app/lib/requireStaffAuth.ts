@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { adminAuth, firebaseAdminConfigured } from './firebaseAdmin';
-import { prisma } from './db';
-import type { Practitioner } from '../prisma/generated/prisma/client';
+import { firestore } from './db';
+import type { PractitionerDoc } from './firestoreModels';
 
 export class AuthError extends Error {
   status: number;
@@ -11,13 +11,17 @@ export class AuthError extends Error {
   }
 }
 
+export interface StaffPractitioner extends PractitionerDoc {
+  id: string;
+}
+
 /**
  * Verifies the Firebase ID token sent as `Authorization: Bearer <token>` and resolves
- * it to a Practitioner row by email. On first successful login for an account, the
- * Practitioner row is back-filled with the Firebase UID so future logins are matched
+ * it to a Practitioner doc by email. On first successful login for an account, the
+ * Practitioner doc is back-filled with the Firebase UID so future logins are matched
  * by UID rather than email alone.
  */
-export async function requireStaffAuth(request: NextRequest): Promise<Practitioner> {
+export async function requireStaffAuth(request: NextRequest): Promise<StaffPractitioner> {
   if (!firebaseAdminConfigured || !adminAuth) {
     throw new AuthError(
       'Staff authentication is not configured on the server (missing FIREBASE_ADMIN_* env vars).',
@@ -38,22 +42,23 @@ export async function requireStaffAuth(request: NextRequest): Promise<Practition
 
   if (!decoded.email) throw new AuthError('Firebase account has no email', 401);
 
-  let practitioner = await prisma.practitioner.findUnique({ where: { email: decoded.email } });
-  if (!practitioner) throw new AuthError('No staff account found for this email', 403);
+  const snap = await firestore.collection('practitioners').where('email', '==', decoded.email).limit(1).get();
+  if (snap.empty) throw new AuthError('No staff account found for this email', 403);
 
-  if (!practitioner.firebaseUid) {
-    practitioner = await prisma.practitioner.update({
-      where: { id: practitioner.id },
-      data: { firebaseUid: decoded.uid },
-    });
-  } else if (practitioner.firebaseUid !== decoded.uid) {
+  const doc = snap.docs[0];
+  const data = doc.data() as PractitionerDoc;
+
+  if (!data.firebaseUid) {
+    await doc.ref.update({ firebaseUid: decoded.uid });
+    data.firebaseUid = decoded.uid;
+  } else if (data.firebaseUid !== decoded.uid) {
     throw new AuthError('Account mismatch', 403);
   }
 
-  return practitioner;
+  return { id: doc.id, ...data };
 }
 
-type RouteHandler<Ctx> = (req: NextRequest, ctx: Ctx, practitioner: Practitioner) => Promise<Response>;
+type RouteHandler<Ctx> = (req: NextRequest, ctx: Ctx, practitioner: StaffPractitioner) => Promise<Response>;
 
 /** Wraps a route handler so it only runs for authenticated staff, handling error responses. */
 export function withStaffAuth<Ctx>(handler: RouteHandler<Ctx>) {

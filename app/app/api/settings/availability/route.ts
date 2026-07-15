@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { prisma } from '../../../../lib/db';
+import { firestore } from '../../../../lib/db';
 import { getDefaultClinic } from '../../../../lib/clinic';
 import { ApiError } from '../../../../lib/apiError';
 import { withStaffAuth } from '../../../../lib/requireStaffAuth';
+import type { AvailabilityWindowDoc, PractitionerDoc } from '../../../../lib/firestoreModels';
 
 interface DayInput {
   weekday: number;
@@ -13,7 +14,7 @@ interface DayInput {
 }
 
 export const PUT = withStaffAuth(async (req: NextRequest) => {
-  const clinic = await getDefaultClinic();
+  await getDefaultClinic();
   const body = await req.json().catch(() => null);
   if (!body) throw new ApiError('Invalid JSON body');
 
@@ -21,8 +22,9 @@ export const PUT = withStaffAuth(async (req: NextRequest) => {
   if (typeof practitionerId !== 'string') throw new ApiError('practitionerId is required');
   if (!Array.isArray(hours)) throw new ApiError('hours must be an array');
 
-  const practitioner = await prisma.practitioner.findFirst({ where: { id: practitionerId, clinicId: clinic.id } });
-  if (!practitioner) throw new ApiError('Unknown practitioner', 404);
+  const ref = firestore.collection('practitioners').doc(practitionerId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new ApiError('Unknown practitioner', 404);
 
   const days = hours as DayInput[];
   for (const day of days) {
@@ -42,29 +44,16 @@ export const PUT = withStaffAuth(async (req: NextRequest) => {
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.availability.deleteMany({ where: { practitionerId } });
-    const openDays = days.filter((d) => d.open);
-    if (openDays.length > 0) {
-      await tx.availability.createMany({
-        data: openDays.map((d) => ({
-          practitionerId,
-          weekday: d.weekday,
-          startMinutes: d.startMinutes!,
-          endMinutes: d.endMinutes!,
-          slotMinutes: d.slotMinutes && d.slotMinutes > 0 ? d.slotMinutes : 15,
-        })),
-      });
-    }
-  });
+  const availability: AvailabilityWindowDoc[] = days
+    .filter((d) => d.open)
+    .map((d) => ({
+      weekday: d.weekday,
+      startMinutes: d.startMinutes!,
+      endMinutes: d.endMinutes!,
+      slotMinutes: d.slotMinutes && d.slotMinutes > 0 ? d.slotMinutes : 15,
+    }));
 
-  const updated = await prisma.availability.findMany({ where: { practitionerId }, orderBy: { weekday: 'asc' } });
-  return NextResponse.json({
-    availability: updated.map((a) => ({
-      weekday: a.weekday,
-      startMinutes: a.startMinutes,
-      endMinutes: a.endMinutes,
-      slotMinutes: a.slotMinutes,
-    })),
-  });
+  await ref.update({ availability } satisfies Partial<PractitionerDoc>);
+
+  return NextResponse.json({ availability });
 });

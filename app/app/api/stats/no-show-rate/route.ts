@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../../lib/db';
+import { firestore } from '../../../../lib/db';
 import { getDefaultClinic } from '../../../../lib/clinic';
 import { withStaffAuth } from '../../../../lib/requireStaffAuth';
+import type { AppointmentDoc } from '../../../../lib/firestoreModels';
 
-async function rateForWindow(clinicId: string, from: Date, to: Date) {
-  const [completed, noShow] = await Promise.all([
-    prisma.appointment.count({ where: { clinicId, status: 'completed', startsAt: { gte: from, lt: to } } }),
-    prisma.appointment.count({ where: { clinicId, status: 'no_show', startsAt: { gte: from, lt: to } } }),
-  ]);
+function rateForWindow(appointments: AppointmentDoc[], from: Date, to: Date) {
+  let completed = 0;
+  let noShow = 0;
+  for (const a of appointments) {
+    const startsAt = a.startsAt.toDate();
+    if (startsAt < from || startsAt >= to) continue;
+    if (a.status === 'completed') completed++;
+    else if (a.status === 'no_show') noShow++;
+  }
   const total = completed + noShow;
   return { total, noShow, rate: total > 0 ? (noShow / total) * 100 : null };
 }
@@ -15,14 +20,15 @@ async function rateForWindow(clinicId: string, from: Date, to: Date) {
 export const GET = withStaffAuth(async () => {
   const clinic = await getDefaultClinic();
 
+  const snap = await firestore.collection('appointments').where('clinicId', '==', clinic.id).get();
+  const appointments = snap.docs.map((doc) => doc.data() as AppointmentDoc);
+
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
-  const [current, previous] = await Promise.all([
-    rateForWindow(clinic.id, thirtyDaysAgo, now),
-    rateForWindow(clinic.id, sixtyDaysAgo, thirtyDaysAgo),
-  ]);
+  const current = rateForWindow(appointments, thirtyDaysAgo, now);
+  const previous = rateForWindow(appointments, sixtyDaysAgo, thirtyDaysAgo);
 
   return NextResponse.json({
     currentRate: current.rate,

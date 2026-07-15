@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { prisma } from '../../../../lib/db';
+import { firestore } from '../../../../lib/db';
 import { getDefaultClinic } from '../../../../lib/clinic';
 import { ApiError } from '../../../../lib/apiError';
 import { withStaffAuth } from '../../../../lib/requireStaffAuth';
@@ -17,13 +17,8 @@ export const PUT = withStaffAuth(async (req: NextRequest) => {
     throw new ApiError('sameDayNudge must be a boolean');
   }
 
-  const settings = await prisma.reminderSettings.upsert({
-    where: { clinicId: clinic.id },
-    update: { hoursBefore, sameDayNudge },
-    create: { clinicId: clinic.id, hoursBefore, sameDayNudge },
-  });
+  const reminderSettings = { hoursBefore, sameDayNudge };
+  await firestore.collection('clinics').doc(clinic.id).update({ reminderSettings });
 
-  return NextResponse.json({
-    reminderSettings: { hoursBefore: settings.hoursBefore, sameDayNudge: settings.sameDayNudge },
-  });
+  return NextResponse.json({ reminderSettings });
 });
